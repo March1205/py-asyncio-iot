@@ -5,13 +5,19 @@ from iot.message import Message, MessageType
 from iot.service import IOTService
 
 
-# async def run_sequence(*functions):
-#     for function in functions:
-#         await function
-#
-#
-# async def run_parallel(*functions):
-#     await asyncio.gather(*functions)
+async def run_sequence(service: IOTService, *messages):
+    for msg in messages:
+        await service.send_msg(msg)
+
+
+async def run_parallel(service: IOTService, *messages):
+    tasks = []
+    for msg in messages:
+        if isinstance(msg, list):
+            tasks.append(run_sequence(service, *msg))
+        else:
+            tasks.append(service.send_msg(msg))
+    await asyncio.gather(*tasks)
 
 
 async def main() -> None:
@@ -29,20 +35,28 @@ async def main() -> None:
     )
 
     # create a few programs
-    wake_up_program = [
+    print("=====RUNNING WAKE-UP PROGRAM======")
+    await run_parallel(
+        service,
         Message(hue_light_id, MessageType.SWITCH_ON),
-        Message(speaker_id, MessageType.SWITCH_ON),
-        Message(speaker_id, MessageType.PLAY_SONG, "Rick Astley - Never Gonna Give You Up"),
-    ]
-    await service.run_program(wake_up_program)
+        [
+            Message(speaker_id, MessageType.SWITCH_ON),
+            Message(speaker_id, MessageType.PLAY_SONG, "Rick Astley - Never Gonna Give You Up"),
+        ]
+    )
+    print("=====END OF WAKE-UP PROGRAM======")
 
-    sleep_program = [
+    print("=====RUNNING SLEEP PROGRAM======")
+    await run_parallel(
+        service,
         Message(hue_light_id, MessageType.SWITCH_OFF),
         Message(speaker_id, MessageType.SWITCH_OFF),
-        Message(toilet_id, MessageType.FLUSH),
-        Message(toilet_id, MessageType.CLEAN),
-    ]
-    await service.run_program(sleep_program)
+        [
+            Message(toilet_id, MessageType.FLUSH),
+            Message(toilet_id, MessageType.CLEAN),
+        ]
+    )
+    print("=====END OF SLEEP PROGRAM======")
 
 
 if __name__ == "__main__":
